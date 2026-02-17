@@ -6,3 +6,9 @@ src-tauri/target/
 TinytoshESP32/build/
 *.bin
 !Tinytosh.bin
+
+.pio
+.idea
+.claude
+.vscode
+CLAUDE.md
