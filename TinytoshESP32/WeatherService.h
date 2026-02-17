@@ -10,6 +10,7 @@ public:
     WeatherService();
     
     bool fetchWeather(const Config& config, WeatherData& data, const String& updateTime);
+    bool fetchForecast(const Config& config, ForecastData& data);
     String getWeatherIcon(int wmo_code);
     String getWeatherDescription(int wmo_code);
     bool isWeatherValid(const WeatherData& data);

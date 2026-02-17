@@ -41,24 +41,23 @@ bool TimeService::fetchLocationData(Config& config) {
 }
 
 String TimeService::lookupPosixTimezone(const String& ianaTimezone) {
-  DynamicJsonDocument doc(6144); 
+  DynamicJsonDocument doc(10240);
   DeserializationError error = deserializeJson(doc, POSIX_TIMEZONE_MAP); 
   if (!error) {
     if (doc.containsKey(ianaTimezone)) {
       return doc[ianaTimezone].as<String>();
     } 
   }
+  Serial.printf("TimeService: Failed to find POSIX timezone for IANA TZ '%s'. Defaulting to GMT0.\n", ianaTimezone.c_str());
+  Serial.printf("TimeService: Deserialization error for POSIX_TIMEZONE_MAP: %s\n", error.c_str());
   return "GMT0";
 }
 
 void TimeService::syncNTP(const String& ianaTimezone) {
   String posixTimezone = lookupPosixTimezone(ianaTimezone);
   
-  Serial.printf("TimeService: Configuring NTP with POSIX rule: %s\n", posixTimezone.c_str()); 
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  
-  setenv("TZ", posixTimezone.c_str(), 1); 
-  tzset(); 
+  Serial.printf("TimeService: Configuring NTP with POSIX rule: %s\n", posixTimezone.c_str());
+  configTzTime(posixTimezone.c_str(), ntpServer);
   
   Serial.println("TimeService: Waiting for NTP time sync..."); 
   time_t now = 0;

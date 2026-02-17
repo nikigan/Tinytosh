@@ -12,7 +12,7 @@ public:
     WebServerService(int port, ConfigSaveCallback callback);
     void begin();
     void handleClient();
-    void setSharedData(Config* config, WeatherData* weather, PcStats* pcStats, CryptoData* cryptoData, AirQualityData* airQualityData);
+    void setSharedData(Config* config, WeatherData* weather, PcStats* pcStats, CryptoData* cryptoData, AirQualityData* airQualityData, ForecastData* forecastData);
     
     void handleRoot();
     void handleSave();
@@ -32,7 +32,8 @@ private:
     PcStats* sharedPcStats;
     CryptoData* sharedCrypto;
     AirQualityData* sharedAirQuality;
-    
+    ForecastData* sharedForecast;
+
     String getWeatherIcon(int wmo_code);
     String getCurrentTimeShort(String format);
     String getFullDate();

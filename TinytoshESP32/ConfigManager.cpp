@@ -27,6 +27,7 @@ void ConfigManager::loadConfig(Config& config) {
   config.show_aqi = preferences.getBool("show_aqi", true);
   config.show_crypto = preferences.getBool("show_crypto", true);
   config.show_pc = preferences.getBool("show_pc", true);
+  config.show_forecast = preferences.getBool("show_fcast", true);
 
   preferences.end();
   Serial.println("ConfigManager: Configuration loaded from NVS."); 
@@ -57,6 +58,7 @@ void ConfigManager::saveConfig(const Config& config) {
   preferences.putBool("show_aqi", config.show_aqi);
   preferences.putBool("show_pc", config.show_pc);
   preferences.putBool("show_crypto", config.show_crypto);
+  preferences.putBool("show_fcast", config.show_forecast);
 
   preferences.end();
   Serial.println("ConfigManager: Config saved."); 

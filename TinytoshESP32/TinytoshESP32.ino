@@ -26,6 +26,7 @@ WeatherData weatherData;
 AirQualityData airQualityData;
 CryptoData cryptoData;
 PcStats pcStats;
+ForecastData forecastData;
 
 // Forward declaration of callback for WebServerService
 void updateAllDataCallback();
@@ -50,7 +51,7 @@ unsigned long lastDebounceTime = 0;
 // Helper Functions
 
 void drawCurrentScreen() {
-    displayService.drawScreen(currentScreen, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData);
+    displayService.drawScreen(currentScreen, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData);
 }
 
 void switchToNextScreen() {
@@ -70,7 +71,7 @@ void switchToNextScreen() {
     if (!foundVisible) return;
 
     displayService.animateTransition(
-      currentScreen, nextScreenCandidate, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData
+      currentScreen, nextScreenCandidate, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData
     );
 
     currentScreen = nextScreenCandidate;
@@ -92,10 +93,16 @@ void updateAllData() {
   timeService.syncNTP(userConfig.timezone);
 
   // 3. Fetch Weather (Depends on Lat/Lon)
-  if (userConfig.show_weather) {  
+  if (userConfig.show_weather) {
     displayService.showOLEDStatus({"\n", "\n", "Updating Weather...", "\n", "Location:", userConfig.city}, true);
     String updateTime = timeService.getCurrentTime(userConfig.time_format);
     weatherService.fetchWeather(userConfig, weatherData, updateTime);
+  }
+
+  // 3b. Fetch Forecast (Depends on Lat/Lon)
+  if (userConfig.show_forecast) {
+    displayService.showOLEDStatus({"\n", "\n", "Updating Forecast...", "\n", "Location:", userConfig.city}, true);
+    weatherService.fetchForecast(userConfig, forecastData);
   }
 
   // 4. Fetch Air Quality (Depends on Lat/Lon)
@@ -167,7 +174,7 @@ void setup() {
   }
 
   // 5. Initialize Web Server
-  webServerService.setSharedData(&userConfig, &weatherData, &pcStats, &cryptoData, &airQualityData);
+  webServerService.setSharedData(&userConfig, &weatherData, &pcStats, &cryptoData, &airQualityData, &forecastData);
   webServerService.begin();
 }
 
@@ -209,6 +216,10 @@ void loop() {
 
     if (userConfig.show_crypto) {
       cryptoService.fetchPrice(userConfig.crypto_id, cryptoData);
+    }
+
+    if (userConfig.show_forecast) {
+      weatherService.fetchForecast(userConfig, forecastData);
     }
 
     lastDataUpdate = millis();

@@ -40,12 +40,13 @@ String WebServerService::getWeatherIcon(int wmo_code) {
 WebServerService::WebServerService(int port, ConfigSaveCallback callback) : 
   server(port), saveCallback(callback), sharedConfig(nullptr), sharedWeather(nullptr) {}
 
-void WebServerService::setSharedData(Config* config, WeatherData* weather, PcStats* pcStats, CryptoData* cryptoData, AirQualityData* airQualityData) {
+void WebServerService::setSharedData(Config* config, WeatherData* weather, PcStats* pcStats, CryptoData* cryptoData, AirQualityData* airQualityData, ForecastData* forecastData) {
   sharedConfig = config;
   sharedWeather = weather;
   sharedPcStats = pcStats;
   sharedCrypto = cryptoData;
   sharedAirQuality = airQualityData;
+  sharedForecast = forecastData;
 }
 
 void WebServerService::begin() {
@@ -203,7 +204,7 @@ String WebServerService::generateRootPageContent() {
   content += "</div>";
 
   content += "<label>Timezone:</label><select name='timezone' style='width:100%;'>";
-  DynamicJsonDocument tzDoc(6144); 
+  DynamicJsonDocument tzDoc(10240); 
   deserializeJson(tzDoc, POSIX_TIMEZONE_MAP); 
   for (JsonPair p : tzDoc.as<JsonObject>()) {
       String key = p.key().c_str();
@@ -255,6 +256,24 @@ String WebServerService::generateRootPageContent() {
   content += "<label style='cursor:pointer; display:flex; align-items:center;'><input type='radio' name='temp_unit' value='F' " + String(config.temp_unit == "F" ? "checked" : "") + " style='margin-right:6px;'> °F</label></div>";
   
   content += "<label style='margin-top:10px; cursor:pointer;'><input type='checkbox' name='round_temps' value='1' " + String(config.round_temps ? "checked" : "") + "> Round Temperature Values</label>";
+  content += "</div></div>";
+
+  // 3b. Forecast Screen
+  content += "<div class='panel'>";
+  content += "<label style='margin:0; cursor:pointer;'><input type='checkbox' id='showForecast' name='show_forecast' value='1' " + String(config.show_forecast ? "checked" : "") + "> Forecast Screen</label>";
+  content += "<div id='forecastContent' class='collapsible'>";
+  if (!sharedForecast->valid) {
+      content += "<div class='no-data-tile'>📅 Forecast data will be available after sync</div>";
+  } else {
+      content += "<div class='dashboard-grid'>";
+      for (int i = 0; i < 3; i++) {
+          String dayLabel = (i == 0) ? "Today" : String(sharedForecast->day_of_week[i]);
+          content += "<div class='tile'><div class='tile-icon'>" + getWeatherIcon(sharedForecast->days[i].weather_code) + "</div>";
+          content += "<div class='tile-value'>" + String((int)round(sharedForecast->days[i].temp_max)) + "° / " + String((int)round(sharedForecast->days[i].temp_min)) + "°</div>";
+          content += "<div class='tile-label'>" + dayLabel + "</div></div>";
+      }
+      content += "</div>";
+  }
   content += "</div></div>";
 
   // 3. Air Quality Screen
@@ -322,7 +341,7 @@ String WebServerService::generateRootPageContent() {
   content += "<script>";
   content += "function updateVisibility(){";
   
-  content += "  var pairs = [['autoDetect','manualFields',true], ['showTime', 'timeContent',false], ['showWeather','weatherContent',false], ['showPc','pcContent',false], ['showCrypto','cryptoContent',false], ['showAQI','aqiContent',false]];";
+  content += "  var pairs = [['autoDetect','manualFields',true], ['showTime', 'timeContent',false], ['showWeather','weatherContent',false], ['showForecast','forecastContent',false], ['showPc','pcContent',false], ['showCrypto','cryptoContent',false], ['showAQI','aqiContent',false]];";
   content += "  pairs.forEach(p => {";
   content += "    var ch = document.getElementById(p[0]); if(!ch) return;";
   content += "    var target = document.getElementById(p[1]);";
@@ -337,7 +356,7 @@ String WebServerService::generateRootPageContent() {
 
   content += "}";
   
-  content += "['autoDetect', 'showTime', 'showWeather', 'showPc', 'showCrypto', 'showAQI', 'autoCycle'].forEach(id => { var el=document.getElementById(id); if(el) el.addEventListener('change', updateVisibility); });";
+  content += "['autoDetect', 'showTime', 'showWeather', 'showForecast', 'showPc', 'showCrypto', 'showAQI', 'autoCycle'].forEach(id => { var el=document.getElementById(id); if(el) el.addEventListener('change', updateVisibility); });";
   content += "updateVisibility();";
 
   // Handle "None" Checkbox Logic
@@ -439,6 +458,7 @@ void WebServerService::handleSave() {
   config.show_aqi = server.hasArg("show_aqi");
   config.show_crypto = server.hasArg("show_crypto");
   config.show_pc = server.hasArg("show_pc");
+  config.show_forecast = server.hasArg("show_forecast");
 
   if (config.show_time) config.date_display = server.hasArg("date_display");
   if (config.show_weather) config.round_temps = server.hasArg("round_temps");
@@ -484,6 +504,10 @@ void WebServerService::handleSave() {
   if (!config.show_crypto) {
     sharedCrypto->price_usd = NAN;
     sharedCrypto->percent_change_24h = NAN;
+  }
+
+  if (!config.show_forecast) {
+    sharedForecast->valid = false;
   }
 
   if (config.refresh_interval_min <= 0) config.refresh_interval_min = 1; 

@@ -30,6 +30,7 @@ struct Config {
   bool show_aqi = true;
   bool show_pc = true;
   bool show_crypto = true;
+  bool show_forecast = true;
 };
 
 struct WeatherData {
@@ -66,9 +67,21 @@ struct CryptoData {
     bool updated = false;
 };
 
-struct CoinOption { 
-    int id; 
-    const char* sym; 
+struct ForecastDay {
+    float temp_max = NAN;
+    float temp_min = NAN;
+    int weather_code = -1;
+};
+
+struct ForecastData {
+    ForecastDay days[3];
+    char day_of_week[3][4]; // "Mon", "Tue", etc.
+    bool valid = false;
+};
+
+struct CoinOption {
+    int id;
+    const char* sym;
 };
 
 inline constexpr CoinOption topCoins[] = {
@@ -86,6 +99,7 @@ enum ScreenType {
   SCREEN_AIR_QUALITY,
   SCREEN_CRYPTO,
   SCREEN_PC_MONITOR,
+  SCREEN_FORECAST,
   NUM_SCREENS
 };
 
