@@ -8,6 +8,8 @@ String DisplayService::getWeatherDescription(int wmo_code) {
     if (wmo_code >= 45 && wmo_code <= 48) return "Fog";
     if (wmo_code >= 51 && wmo_code <= 67) return "Rain";
     if (wmo_code >= 71 && wmo_code <= 77) return "Snow";
+    if (wmo_code >= 80 && wmo_code <= 82) return "Rain Showers";
+    if (wmo_code >= 85 && wmo_code <= 86) return "Snow Showers";
     if (wmo_code >= 95) return "Thunder";
     return "Unknown";
 }
@@ -28,6 +30,8 @@ const unsigned char* DisplayService::getWeatherBitmap(int wmo_code, bool is_day)
     else if (wmo_code >= 45 && wmo_code <= 48) return icon_fog;
     else if (wmo_code >= 51 && wmo_code <= 67) return icon_rain;
     else if (wmo_code >= 71 && wmo_code <= 77) return icon_snow;
+    else if (wmo_code >= 80 && wmo_code <= 82) return icon_rain;
+    else if (wmo_code >= 85 && wmo_code <= 86) return icon_snow;
     else if (wmo_code >= 95) return icon_thunder;
     return icon_cloud;
 }
