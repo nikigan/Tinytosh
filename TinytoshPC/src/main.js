@@ -1,4 +1,5 @@
 const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 
 async function initAutostart() {
   const cb = document.getElementById("autostart-cb");
@@ -126,11 +127,38 @@ async function toggleConnection() {
   }
 }
 
+let pomodoroActive = false;
+
+async function togglePomodoro() {
+  const btn = document.getElementById("pomo-btn");
+  try {
+    const nowActive = await invoke("toggle_pomodoro");
+    pomodoroActive = nowActive;
+    if (btn) {
+      btn.innerText = nowActive ? "Stop Pomodoro" : "Start Pomodoro";
+      btn.className = nowActive ? "btn-pomo btn-red" : "btn-pomo btn-blue";
+    }
+  } catch (e) {
+    if (btn) setUiStatus(String(e), "#ef4444");
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("conn-btn");
   if(btn) btn.addEventListener("click", toggleConnection);
+  const pomoBtn = document.getElementById("pomo-btn");
+  if(pomoBtn) pomoBtn.addEventListener("click", togglePomodoro);
   initAutostart();
   loadPorts();
-  setInterval(loadPorts, 2000); 
-  setInterval(updateStats, 1000); 
+  setInterval(loadPorts, 2000);
+  setInterval(updateStats, 1000);
+
+  listen("pomodoro-changed", (event) => {
+    pomodoroActive = event.payload;
+    const pb = document.getElementById("pomo-btn");
+    if (pb) {
+      pb.innerText = pomodoroActive ? "Stop Pomodoro" : "Start Pomodoro";
+      pb.className = pomodoroActive ? "btn-pomo btn-red" : "btn-pomo btn-blue";
+    }
+  });
 });

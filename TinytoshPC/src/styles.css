@@ -83,8 +83,18 @@ body {
   margin-top: 5px;
 }
 
+.pomodoro-section {
+  flex: 0 0 auto;
+  margin-bottom: 15px;
+}
+
+.btn-pomo {
+  padding: 12px;
+  font-size: 0.95rem;
+}
+
 .controls {
-  flex: 0 0 auto; 
+  flex: 0 0 auto;
 }
 
 select {

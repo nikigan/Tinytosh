@@ -27,6 +27,7 @@ AirQualityData airQualityData;
 CryptoData cryptoData;
 PcStats pcStats;
 ForecastData forecastData;
+PomodoroData pomodoroData;
 
 // Forward declaration of callback for WebServerService
 void updateAllDataCallback();
@@ -43,6 +44,7 @@ CryptoService cryptoService;
 
 unsigned long lastScreenSwitch = 0;
 int currentScreen = SCREEN_TIME;
+bool prevPomodoroActive = false;
 
 int buttonState;             
 int lastButtonState = LOW;   
@@ -51,7 +53,7 @@ unsigned long lastDebounceTime = 0;
 // Helper Functions
 
 void drawCurrentScreen() {
-    displayService.drawScreen(currentScreen, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData);
+    displayService.drawScreen(currentScreen, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData, pomodoroData);
 }
 
 void switchToNextScreen() {
@@ -62,7 +64,7 @@ void switchToNextScreen() {
     do {
         nextScreenCandidate++;
         if (nextScreenCandidate >= NUM_SCREENS) nextScreenCandidate = 0;
-        if (displayService.isScreenEnabled(userConfig, nextScreenCandidate)) {
+        if (displayService.isScreenEnabled(userConfig, nextScreenCandidate, pomodoroData)) {
             foundVisible = true;
             break;
         }
@@ -71,7 +73,7 @@ void switchToNextScreen() {
     if (!foundVisible) return;
 
     displayService.animateTransition(
-      currentScreen, nextScreenCandidate, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData
+      currentScreen, nextScreenCandidate, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData, pomodoroData
     );
 
     currentScreen = nextScreenCandidate;
@@ -123,7 +125,7 @@ void updateAllData() {
   // 7. Find the first enabled screen to show immediately
   currentScreen = SCREEN_TIME;
   for (int i = 0; i < NUM_SCREENS; i++) {
-      if (displayService.isScreenEnabled(userConfig, i)) {
+      if (displayService.isScreenEnabled(userConfig, i, pomodoroData)) {
           currentScreen = i;
           break;
       }
@@ -181,9 +183,7 @@ void setup() {
 void loop() {
   webServerService.handleClient();
 
-  if (userConfig.show_pc) {
-    pcMonitorService.handleSerial(pcStats);
-  }
+  pcMonitorService.handleSerial(pcStats, pomodoroData);
 
   int reading = digitalRead(BUTTON_PIN);
 
@@ -225,8 +225,36 @@ void loop() {
     lastDataUpdate = millis();
   }
 
-  // 2. Auto Screen Switching Logic
-  if (userConfig.screen_auto_cycle) {
+  // 2. Pomodoro Timer Logic
+  if (pomodoroData.active) {
+      unsigned long elapsed = millis() - pomodoroData.start_millis;
+      if (elapsed >= pomodoroData.phase_duration_ms) {
+          pomodoroData.is_work = !pomodoroData.is_work;
+          pomodoroData.start_millis = millis();
+          pomodoroData.phase_duration_ms = pomodoroData.is_work ? POMODORO_WORK_MS : POMODORO_BREAK_MS;
+          elapsed = 0;
+      }
+      unsigned long remaining_ms = pomodoroData.phase_duration_ms - elapsed;
+      pomodoroData.remaining_seconds = (int)(remaining_ms / 1000);
+  }
+
+  // Auto-switch to pomodoro screen on activation
+  if (pomodoroData.active && !prevPomodoroActive) {
+      displayService.animateTransition(
+        currentScreen, SCREEN_POMODORO, userConfig, timeService, weatherData, airQualityData, pcStats, cryptoData, forecastData, pomodoroData
+      );
+      currentScreen = SCREEN_POMODORO;
+      lastScreenSwitch = millis();
+  }
+  if (!pomodoroData.active && prevPomodoroActive) {
+      // Resume normal screen when pomodoro stops
+      switchToNextScreen();
+      lastScreenSwitch = millis();
+  }
+  prevPomodoroActive = pomodoroData.active;
+
+  // 3. Auto Screen Switching Logic (suppressed during pomodoro)
+  if (userConfig.screen_auto_cycle && !pomodoroData.active) {
       unsigned long intervalMs = userConfig.screen_interval_sec * 1000;
       if (millis() - lastScreenSwitch >= intervalMs) {
         switchToNextScreen();
@@ -234,7 +262,7 @@ void loop() {
       }
   }
 
-  // 3. Screen Redraw Logic
+  // 4. Screen Redraw Logic
   static unsigned long lastScreenUpdate = 0;
   if (millis() - lastScreenUpdate >= 1000) { 
     drawCurrentScreen();

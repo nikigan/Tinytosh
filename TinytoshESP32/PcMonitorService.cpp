@@ -2,14 +2,14 @@
 #include "PcMonitorService.h"
 
 
-void PcMonitorService::handleSerial(PcStats &stats) {
+void PcMonitorService::handleSerial(PcStats &stats, PomodoroData &pomodoro) {
     // 1. Process incoming Serial data
     while (Serial.available()) {
         char incomingChar = Serial.read();
         if (incomingChar == '\n' || incomingChar == '\r') {
             if (bufferIndex > 0) {
                 serialBuffer[bufferIndex] = '\0';
-                parseJson(serialBuffer, stats); 
+                parseJson(serialBuffer, stats, pomodoro);
             }
             bufferIndex = 0;
         } else if (bufferIndex < 256 - 1) {
@@ -26,12 +26,27 @@ void PcMonitorService::handleSerial(PcStats &stats) {
     }
 }
 
-void PcMonitorService::parseJson(const char* jsonString, PcStats &stats) {
+void PcMonitorService::parseJson(const char* jsonString, PcStats &stats, PomodoroData &pomodoro) {
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, jsonString);
-    
+
     if (error) {
         return;
+    }
+
+    // Handle pomodoro commands
+    if (doc.containsKey("pomo_cmd")) {
+        const char* cmd = doc["pomo_cmd"];
+        if (strcmp(cmd, "start") == 0) {
+            pomodoro.active = true;
+            pomodoro.is_work = true;
+            pomodoro.start_millis = millis();
+            pomodoro.phase_duration_ms = POMODORO_WORK_MS;
+        } else if (strcmp(cmd, "stop") == 0) {
+            pomodoro.active = false;
+        }
+        // If this JSON only has pomo_cmd, skip stats parsing
+        if (!doc.containsKey("cpu_percent")) return;
     }
 
     lastDataTimestamp = millis();

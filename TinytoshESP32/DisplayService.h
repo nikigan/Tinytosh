@@ -20,23 +20,24 @@ public:
     void drawPcScreen(const PcStats& pcStats);
     void drawCryptoScreen(const CryptoData& data);
     void drawForecastScreen(const Config& config, const ForecastData& data);
+    void drawPomodoroScreen(const PomodoroData& data);
     void drawNoData();
 
-    void drawScreen(int screenIndex, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast);
-    void animateTransition(int prevScreen, int nextScreen, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast);
+    void drawScreen(int screenIndex, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast, const PomodoroData& pomodoro);
+    void animateTransition(int prevScreen, int nextScreen, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast, const PomodoroData& pomodoro);
 
-    bool isScreenEnabled(const Config& config, int screenIndex);
+    bool isScreenEnabled(const Config& config, int screenIndex, const PomodoroData& pomodoro);
 
 private:    
     uint8_t screenBufferOld[1024];
     uint8_t screenBufferNew[1024];
 
     int getNextAnimationEffect(uint16_t mask);
-    void animateHorizontal(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc);
-    void animateVertical(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc);
-    void animateDissolve(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc);
-    void animateCurtain(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc);
-    void animateBlinds(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc);
+    void animateHorizontal(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc, const PomodoroData& pm);
+    void animateVertical(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc, const PomodoroData& pm);
+    void animateDissolve(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc, const PomodoroData& pm);
+    void animateCurtain(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc, const PomodoroData& pm);
+    void animateBlinds(int prev, int next, const Config& c, TimeService& t, const WeatherData& w, const AirQualityData& a, const PcStats& p, const CryptoData& cr, const ForecastData& fc, const PomodoroData& pm);
 
     String getWeatherDescription(int wmo_code);
     const unsigned char* getWeatherBitmap(int wmo_code, bool is_day);
