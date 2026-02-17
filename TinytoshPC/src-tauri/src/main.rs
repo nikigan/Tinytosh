@@ -103,7 +103,7 @@ fn toggle_connection(state: tauri::State<AppState>, port_name: String, connect: 
     }
 }
 
-fn do_toggle_pomodoro(state: &AppState) -> Result<bool, String> {
+fn do_toggle_pomodoro(state: &AppState, work_min: u32, break_min: u32) -> Result<bool, String> {
     let mut port_guard = state.port.lock().unwrap();
     let Some(port) = port_guard.as_mut() else {
         return Err("Not connected to device".to_string());
@@ -111,7 +111,11 @@ fn do_toggle_pomodoro(state: &AppState) -> Result<bool, String> {
     let mut pomo = state.pomodoro_active.lock().unwrap();
     *pomo = !*pomo;
     let now_active = *pomo;
-    let cmd = if now_active { r#"{"pomo_cmd":"start"}"# } else { r#"{"pomo_cmd":"stop"}"# };
+    let cmd = if now_active {
+        format!(r#"{{"pomo_cmd":"start","work_min":{},"break_min":{}}}"#, work_min, break_min)
+    } else {
+        r#"{"pomo_cmd":"stop"}"#.to_string()
+    };
     if let Err(e) = port.write(format!("{}\n", cmd).as_bytes()) {
         *pomo = !now_active;
         return Err(e.to_string());
@@ -119,9 +123,25 @@ fn do_toggle_pomodoro(state: &AppState) -> Result<bool, String> {
     Ok(now_active)
 }
 
+fn rebuild_tray_menu(app: &tauri::AppHandle, pomo_active: bool) {
+    let pomo_text = if pomo_active { "Stop Pomodoro" } else { "Start Pomodoro" };
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = (|| -> Result<(), Box<dyn std::error::Error>> {
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let pomo_i = MenuItem::with_id(app, "pomodoro", pomo_text, true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &pomo_i, &quit_i])?;
+            tray.set_menu(Some(menu))?;
+            Ok(())
+        })();
+    }
+}
+
 #[tauri::command]
-fn toggle_pomodoro(state: tauri::State<AppState>) -> Result<bool, String> {
-    do_toggle_pomodoro(&state)
+fn toggle_pomodoro(app: tauri::AppHandle, state: tauri::State<AppState>, work_min: u32, break_min: u32) -> Result<bool, String> {
+    let now_active = do_toggle_pomodoro(&state, work_min, break_min)?;
+    rebuild_tray_menu(&app, now_active);
+    Ok(now_active)
 }
 
 fn show_window_safely(window: tauri::WebviewWindow) {
@@ -159,19 +179,9 @@ fn main() {
                         "show" => { if let Some(w) = app.get_webview_window("main") { show_window_safely(w); } }
                         "pomodoro" => {
                             let state = app.state::<AppState>();
-                            if let Ok(now_active) = do_toggle_pomodoro(state.inner()) {
+                            if let Ok(now_active) = do_toggle_pomodoro(state.inner(), 45, 5) {
                                 let _ = app.emit("pomodoro-changed", now_active);
-                                let pomo_text = if now_active { "Stop Pomodoro" } else { "Start Pomodoro" };
-                                if let Some(tray) = app.tray_by_id("main") {
-                                    let _ = (|| -> Result<(), Box<dyn std::error::Error>> {
-                                        let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-                                        let pomo_i = MenuItem::with_id(app, "pomodoro", pomo_text, true, None::<&str>)?;
-                                        let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-                                        let menu = Menu::with_items(app, &[&show_i, &pomo_i, &quit_i])?;
-                                        tray.set_menu(Some(menu))?;
-                                        Ok(())
-                                    })();
-                                }
+                                rebuild_tray_menu(app, now_active);
                             }
                         }
                         _ => {}

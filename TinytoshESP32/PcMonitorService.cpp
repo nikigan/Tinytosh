@@ -41,7 +41,9 @@ void PcMonitorService::parseJson(const char* jsonString, PcStats &stats, Pomodor
             pomodoro.active = true;
             pomodoro.is_work = true;
             pomodoro.start_millis = millis();
-            pomodoro.phase_duration_ms = POMODORO_WORK_MS;
+            pomodoro.work_ms = (doc["work_min"] | 45) * 60UL * 1000;
+            pomodoro.break_ms = (doc["break_min"] | 5) * 60UL * 1000;
+            pomodoro.phase_duration_ms = pomodoro.work_ms;
         } else if (strcmp(cmd, "stop") == 0) {
             pomodoro.active = false;
         }

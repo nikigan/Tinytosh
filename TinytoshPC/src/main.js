@@ -129,17 +129,27 @@ async function toggleConnection() {
 
 let pomodoroActive = false;
 
-async function togglePomodoro() {
+function updatePomoUi(active) {
+  pomodoroActive = active;
   const btn = document.getElementById("pomo-btn");
+  const workInput = document.getElementById("work-min");
+  const breakInput = document.getElementById("break-min");
+  if (btn) {
+    btn.innerText = active ? "Stop Pomodoro" : "Start Pomodoro";
+    btn.className = active ? "btn-pomo btn-red" : "btn-pomo btn-blue";
+  }
+  if (workInput) workInput.disabled = active;
+  if (breakInput) breakInput.disabled = active;
+}
+
+async function togglePomodoro() {
+  const workMin = parseInt(document.getElementById("work-min").value) || 45;
+  const breakMin = parseInt(document.getElementById("break-min").value) || 5;
   try {
-    const nowActive = await invoke("toggle_pomodoro");
-    pomodoroActive = nowActive;
-    if (btn) {
-      btn.innerText = nowActive ? "Stop Pomodoro" : "Start Pomodoro";
-      btn.className = nowActive ? "btn-pomo btn-red" : "btn-pomo btn-blue";
-    }
+    const nowActive = await invoke("toggle_pomodoro", { workMin, breakMin });
+    updatePomoUi(nowActive);
   } catch (e) {
-    if (btn) setUiStatus(String(e), "#ef4444");
+    setUiStatus(String(e), "#ef4444");
   }
 }
 
@@ -154,11 +164,6 @@ window.addEventListener("DOMContentLoaded", () => {
   setInterval(updateStats, 1000);
 
   listen("pomodoro-changed", (event) => {
-    pomodoroActive = event.payload;
-    const pb = document.getElementById("pomo-btn");
-    if (pb) {
-      pb.innerText = pomodoroActive ? "Stop Pomodoro" : "Start Pomodoro";
-      pb.className = pomodoroActive ? "btn-pomo btn-red" : "btn-pomo btn-blue";
-    }
+    updatePomoUi(event.payload);
   });
 });

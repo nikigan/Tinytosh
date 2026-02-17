@@ -231,8 +231,9 @@ void loop() {
       if (elapsed >= pomodoroData.phase_duration_ms) {
           pomodoroData.is_work = !pomodoroData.is_work;
           pomodoroData.start_millis = millis();
-          pomodoroData.phase_duration_ms = pomodoroData.is_work ? POMODORO_WORK_MS : POMODORO_BREAK_MS;
+          pomodoroData.phase_duration_ms = pomodoroData.is_work ? pomodoroData.work_ms : pomodoroData.break_ms;
           elapsed = 0;
+          displayService.blinkScreen(5, 500, 100);
       }
       unsigned long remaining_ms = pomodoroData.phase_duration_ms - elapsed;
       pomodoroData.remaining_seconds = (int)(remaining_ms / 1000);

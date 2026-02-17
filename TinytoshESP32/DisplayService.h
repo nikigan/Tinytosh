@@ -22,6 +22,7 @@ public:
     void drawForecastScreen(const Config& config, const ForecastData& data);
     void drawPomodoroScreen(const PomodoroData& data);
     void drawNoData();
+    void blinkScreen(int count, int on_ms, int off_ms);
 
     void drawScreen(int screenIndex, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast, const PomodoroData& pomodoro);
     void animateTransition(int prevScreen, int nextScreen, const Config& config, TimeService& timeService, const WeatherData& weather, const AirQualityData& aqi, const PcStats& pc, const CryptoData& crypto, const ForecastData& forecast, const PomodoroData& pomodoro);

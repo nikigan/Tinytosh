@@ -88,6 +88,64 @@ body {
   margin-bottom: 15px;
 }
 
+.pomo-inputs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pomo-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.pomo-field label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pomo-field input[type="number"] {
+  width: 48px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.pomo-field input[type="number"]::-webkit-inner-spin-button,
+.pomo-field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pomo-field input[type="number"]:focus {
+  border-color: var(--accent);
+}
+
+.pomo-field input[type="number"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pomo-field span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .btn-pomo {
   padding: 12px;
   font-size: 0.95rem;

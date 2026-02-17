@@ -516,6 +516,15 @@ void DisplayService::drawPomodoroScreen(const PomodoroData& data) {
     display.print(buf);
 }
 
+void DisplayService::blinkScreen(int count, int on_ms, int off_ms) {
+    for (int i = 0; i < count; i++) {
+        display.invertDisplay(true);
+        delay(on_ms);
+        display.invertDisplay(false);
+        if (i < count - 1) delay(off_ms);
+    }
+}
+
 bool DisplayService::isScreenEnabled(const Config& config, int screenIndex, const PomodoroData& pomodoro) {
     switch (screenIndex) {
         case SCREEN_TIME:           return config.show_time;
