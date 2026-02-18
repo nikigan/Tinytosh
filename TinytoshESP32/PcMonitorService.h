@@ -8,7 +8,7 @@
 class PcMonitorService {
 public:
 
-    void handleSerial(PcStats &stats);
+    void handleSerial(PcStats &stats, PomodoroData &pomodoro);
     const PcStats& getStats() const;
 
 private:
@@ -19,7 +19,7 @@ private:
     char serialBuffer[JSON_BUF_SIZE];
     int bufferIndex = 0;
 
-    void parseJson(const char* jsonString, PcStats &stats);
+    void parseJson(const char* jsonString, PcStats &stats, PomodoroData &pomodoro);
 
     unsigned long lastDataTimestamp = 0; 
     const unsigned long DATA_TIMEOUT_MS = 3000;

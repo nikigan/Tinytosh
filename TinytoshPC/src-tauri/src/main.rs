@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::env; 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
-use tauri::{Manager, WindowEvent, Size, LogicalSize}; 
+use tauri::{Emitter, Manager, WindowEvent, Size, LogicalSize};
 use sysinfo::{System, Disks, Networks}; 
 use serialport::{SerialPort, SerialPortType};
 use tauri_plugin_autostart::ManagerExt;
@@ -16,7 +16,8 @@ struct AppState {
     port: Mutex<Option<Box<dyn SerialPort>>>,
     active_port_name: Mutex<String>,
     manual_disconnect: Mutex<bool>,
-    status_msg: Mutex<String>, 
+    status_msg: Mutex<String>,
+    pomodoro_active: Mutex<bool>,
 }
 
 #[derive(serde::Serialize)]
@@ -102,6 +103,47 @@ fn toggle_connection(state: tauri::State<AppState>, port_name: String, connect: 
     }
 }
 
+fn do_toggle_pomodoro(state: &AppState, work_min: u32, break_min: u32) -> Result<bool, String> {
+    let mut port_guard = state.port.lock().unwrap();
+    let Some(port) = port_guard.as_mut() else {
+        return Err("Not connected to device".to_string());
+    };
+    let mut pomo = state.pomodoro_active.lock().unwrap();
+    *pomo = !*pomo;
+    let now_active = *pomo;
+    let cmd = if now_active {
+        format!(r#"{{"pomo_cmd":"start","work_min":{},"break_min":{}}}"#, work_min, break_min)
+    } else {
+        r#"{"pomo_cmd":"stop"}"#.to_string()
+    };
+    if let Err(e) = port.write(format!("{}\n", cmd).as_bytes()) {
+        *pomo = !now_active;
+        return Err(e.to_string());
+    }
+    Ok(now_active)
+}
+
+fn rebuild_tray_menu(app: &tauri::AppHandle, pomo_active: bool) {
+    let pomo_text = if pomo_active { "Stop Pomodoro" } else { "Start Pomodoro" };
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = (|| -> Result<(), Box<dyn std::error::Error>> {
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let pomo_i = MenuItem::with_id(app, "pomodoro", pomo_text, true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &pomo_i, &quit_i])?;
+            tray.set_menu(Some(menu))?;
+            Ok(())
+        })();
+    }
+}
+
+#[tauri::command]
+fn toggle_pomodoro(app: tauri::AppHandle, state: tauri::State<AppState>, work_min: u32, break_min: u32) -> Result<bool, String> {
+    let now_active = do_toggle_pomodoro(&state, work_min, break_min)?;
+    rebuild_tray_menu(&app, now_active);
+    Ok(now_active)
+}
+
 fn show_window_safely(window: tauri::WebviewWindow) {
     let _ = window.set_min_size(Some(Size::Logical(LogicalSize { width: 300.0, height: 400.0 })));
     let _ = window.unminimize(); 
@@ -116,23 +158,32 @@ fn main() {
         active_port_name: Mutex::new(String::new()),
         manual_disconnect: Mutex::new(false),
         status_msg: Mutex::new("Waiting for connection...".to_string()),
+        pomodoro_active: Mutex::new(false),
     };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .manage(app_state) 
-        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart])
+        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart, toggle_pomodoro])
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+            let pomo_i = MenuItem::with_id(app, "pomodoro", "Start Pomodoro", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &pomo_i, &quit_i])?;
             let icon = app.default_window_icon().unwrap().clone();
             
-            let _tray = TrayIconBuilder::new().icon(icon).menu(&menu)
+            let _tray = TrayIconBuilder::with_id("main").icon(icon).menu(&menu)
                 .on_menu_event(|app: &tauri::AppHandle, event| {
                     match event.id().as_ref() {
                         "quit" => app.exit(0),
                         "show" => { if let Some(w) = app.get_webview_window("main") { show_window_safely(w); } }
+                        "pomodoro" => {
+                            let state = app.state::<AppState>();
+                            if let Ok(now_active) = do_toggle_pomodoro(state.inner(), 45, 5) {
+                                let _ = app.emit("pomodoro-changed", now_active);
+                                rebuild_tray_menu(app, now_active);
+                            }
+                        }
                         _ => {}
                     }
                 })

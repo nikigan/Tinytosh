@@ -93,6 +93,16 @@ inline constexpr CoinOption topCoins[] = {
     {47214, "ICP"}, {32703, "LEO"}, {28, "XMR"}, {172, "XLM"}, {29854, "OKB"}
 };
 
+struct PomodoroData {
+    bool active = false;
+    bool is_work = true;
+    unsigned long start_millis = 0;
+    unsigned long phase_duration_ms = 0;
+    unsigned long work_ms = 45UL * 60 * 1000;
+    unsigned long break_ms = 5UL * 60 * 1000;
+    int remaining_seconds = 0;
+};
+
 enum ScreenType {
   SCREEN_TIME,
   SCREEN_WEATHER,
@@ -100,6 +110,7 @@ enum ScreenType {
   SCREEN_CRYPTO,
   SCREEN_PC_MONITOR,
   SCREEN_FORECAST,
+  SCREEN_POMODORO,
   NUM_SCREENS
 };
 
