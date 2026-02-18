@@ -1,6 +1,6 @@
 [package]
 name = "tinytosh-pc"
-version = "1.0.0"
+version = "1.0.3"
 description = "Tinytosh PC Bridge"
 authors = ["UladzimirHitsarau"]
 edition = "2021"
