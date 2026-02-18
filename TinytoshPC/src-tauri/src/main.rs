@@ -158,6 +158,18 @@ fn rebuild_tray_menu(app: &tauri::AppHandle, pomo_active: bool) {
 }
 
 #[tauri::command]
+fn switch_screen(state: tauri::State<AppState>) -> Result<(), String> {
+    let mut port_guard = state.port.lock().unwrap();
+    let Some(port) = port_guard.as_mut() else {
+        return Err("Not connected to device".to_string());
+    };
+    let cmd = r#"{"screen_cmd":"next"}"#;
+    port.write(format!("{}\n", cmd).as_bytes())
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn toggle_pomodoro(app: tauri::AppHandle, state: tauri::State<AppState>, work_min: u32, break_min: u32) -> Result<bool, String> {
     let now_active = do_toggle_pomodoro(&state, work_min, break_min)?;
     rebuild_tray_menu(&app, now_active);
@@ -191,7 +203,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .manage(app_state) 
-        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart, toggle_pomodoro])
+        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart, toggle_pomodoro, switch_screen])
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;

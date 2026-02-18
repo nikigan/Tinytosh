@@ -151,6 +151,12 @@ body {
   font-size: 0.95rem;
 }
 
+.btn-screen {
+  padding: 12px;
+  font-size: 0.95rem;
+  margin-bottom: 15px;
+}
+
 .controls {
   flex: 0 0 auto;
 }

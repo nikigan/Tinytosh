@@ -10,6 +10,7 @@ public:
 
     void handleSerial(PcStats &stats, PomodoroData &pomodoro);
     const PcStats& getStats() const;
+    bool screenSwitchRequested = false;
 
 private:
     PcStats currentStats = {0.0, 0.0, 0.0, 0.0};
