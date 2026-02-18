@@ -2,13 +2,15 @@
 
 use std::thread;
 use std::time::Duration;
-use std::sync::Mutex; 
-use std::env; 
+use std::sync::Mutex;
+use std::env;
+use std::fs;
+use std::path::PathBuf;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri::{Emitter, Manager, WindowEvent, Size, LogicalSize};
-use sysinfo::{System, Disks, Networks}; 
-use serialport::{SerialPort, SerialPortType};
+use sysinfo::{System, Disks, Networks};
+use serialport::SerialPort;
 use tauri_plugin_autostart::ManagerExt;
 
 struct AppState {
@@ -18,6 +20,26 @@ struct AppState {
     manual_disconnect: Mutex<bool>,
     status_msg: Mutex<String>,
     pomodoro_active: Mutex<bool>,
+    saved_port_name: Mutex<String>,
+    config_path: PathBuf,
+}
+
+fn config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("com.tinytosh.app")
+}
+
+fn load_saved_port(config_path: &PathBuf) -> String {
+    fs::read_to_string(config_path.join("saved_port"))
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn save_port_to_file(config_path: &PathBuf, port_name: &str) {
+    let _ = fs::create_dir_all(config_path);
+    let _ = fs::write(config_path.join("saved_port"), port_name);
 }
 
 #[derive(serde::Serialize)]
@@ -71,33 +93,31 @@ fn get_ports(state: tauri::State<AppState>) -> PortStatus {
 
 #[tauri::command]
 fn toggle_connection(state: tauri::State<AppState>, port_name: String, connect: bool) -> Result<String, String> {
-    let mut port_guard = state.port.lock().unwrap();
-    let mut name_guard = state.active_port_name.lock().unwrap();
-    let mut manual_guard = state.manual_disconnect.lock().unwrap();
-    let mut status_guard = state.status_msg.lock().unwrap();
-    
     if !connect {
-        *port_guard = None;
-        *name_guard = String::new();
-        *manual_guard = true;
-        *status_guard = "Disconnected".to_string(); 
+        *state.port.lock().unwrap() = None;
+        *state.active_port_name.lock().unwrap() = String::new();
+        *state.manual_disconnect.lock().unwrap() = true;
+        *state.status_msg.lock().unwrap() = "Disconnected".to_string();
         return Ok("Disconnected".to_string());
     }
 
     match serialport::new(port_name.clone(), 115200)
         .timeout(Duration::from_millis(100))
-        .open() 
+        .open()
     {
         Ok(p) => {
-            *port_guard = Some(p);
-            *name_guard = port_name;
-            *manual_guard = false;
-            *status_guard = String::new();
+            *state.port.lock().unwrap() = Some(p);
+            *state.active_port_name.lock().unwrap() = port_name.clone();
+            *state.manual_disconnect.lock().unwrap() = false;
+            *state.status_msg.lock().unwrap() = String::new();
+            // Save as preferred device for future auto-connect
+            *state.saved_port_name.lock().unwrap() = port_name.clone();
+            save_port_to_file(&state.config_path, &port_name);
             Ok("Connected".to_string())
         }
         Err(e) => {
             let err_msg = format!("Connection failed: {}", e);
-            *status_guard = err_msg.clone();
+            *state.status_msg.lock().unwrap() = err_msg.clone();
             Err(err_msg)
         }
     }
@@ -138,6 +158,18 @@ fn rebuild_tray_menu(app: &tauri::AppHandle, pomo_active: bool) {
 }
 
 #[tauri::command]
+fn switch_screen(state: tauri::State<AppState>) -> Result<(), String> {
+    let mut port_guard = state.port.lock().unwrap();
+    let Some(port) = port_guard.as_mut() else {
+        return Err("Not connected to device".to_string());
+    };
+    let cmd = r#"{"screen_cmd":"next"}"#;
+    port.write(format!("{}\n", cmd).as_bytes())
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn toggle_pomodoro(app: tauri::AppHandle, state: tauri::State<AppState>, work_min: u32, break_min: u32) -> Result<bool, String> {
     let now_active = do_toggle_pomodoro(&state, work_min, break_min)?;
     rebuild_tray_menu(&app, now_active);
@@ -152,19 +184,26 @@ fn show_window_safely(window: tauri::WebviewWindow) {
 }
 
 fn main() {
+    let cfg_path = config_dir();
+    let saved = load_saved_port(&cfg_path);
+    let has_saved = !saved.is_empty();
+
     let app_state = AppState {
         stats: Mutex::new("{}".to_string()),
         port: Mutex::new(None),
         active_port_name: Mutex::new(String::new()),
-        manual_disconnect: Mutex::new(false),
+        // Only auto-scan if we have a previously saved device
+        manual_disconnect: Mutex::new(!has_saved),
         status_msg: Mutex::new("Waiting for connection...".to_string()),
         pomodoro_active: Mutex::new(false),
+        saved_port_name: Mutex::new(saved),
+        config_path: cfg_path,
     };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .manage(app_state) 
-        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart, toggle_pomodoro])
+        .invoke_handler(tauri::generate_handler![get_stats, get_ports, toggle_connection, set_autostart, check_autostart, toggle_pomodoro, switch_screen])
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
@@ -262,36 +301,26 @@ fn main() {
                         }
                     }
 
-                    // 4. AUTO-SCAN FOR DEVICE
+                    // 4. AUTO-RECONNECT TO SAVED DEVICE
                     if needs_scan {
-                         scan_counter += 1;
-                         if scan_counter > 2 {
-                            scan_counter = 0;
-                            let available = serialport::available_ports().unwrap_or(vec![]);
-                            let mut target_port = String::new();
-                            for p in available {
-                                let name = p.port_name.to_lowercase();
-                                let product = match p.port_type { 
-                                    SerialPortType::UsbPort(info) => info.product.unwrap_or_default().to_lowercase(), 
-                                    _ => String::new() 
-                                };
-                                
-                                if name.contains("usb") || name.contains("acm") || name.contains("serial") || name.contains("jtag") || name.contains("com") ||
-                                   product.contains("cp210") || product.contains("ch340") || product.contains("esp32") || product.contains("serial") || product.contains("jtag") {
-                                    target_port = p.port_name;
-                                    break;
+                         let saved = state.saved_port_name.lock().unwrap().clone();
+                         if !saved.is_empty() {
+                             scan_counter += 1;
+                             if scan_counter > 2 {
+                                scan_counter = 0;
+                                let available = serialport::available_ports().unwrap_or(vec![]);
+                                let found = available.iter().any(|p| p.port_name == saved);
+                                if found {
+                                    if let Ok(p) = serialport::new(saved.clone(), 115200).timeout(Duration::from_millis(100)).open() {
+                                        let mut port_guard = state.port.lock().unwrap();
+                                        *port_guard = Some(p);
+                                        *state.active_port_name.lock().unwrap() = saved;
+                                        *state.manual_disconnect.lock().unwrap() = false;
+                                        *state.status_msg.lock().unwrap() = String::new();
+                                    }
                                 }
                             }
-                            if !target_port.is_empty() {
-                                if let Ok(p) = serialport::new(target_port.clone(), 115200).timeout(Duration::from_millis(100)).open() {
-                                    let mut port_guard = state.port.lock().unwrap();
-                                    *port_guard = Some(p);
-                                    *state.active_port_name.lock().unwrap() = target_port;
-                                    *state.manual_disconnect.lock().unwrap() = false;
-                                    *state.status_msg.lock().unwrap() = String::new(); 
-                                }
-                            }
-                        }
+                         }
                     }
                     thread::sleep(Duration::from_secs(1));
                 }

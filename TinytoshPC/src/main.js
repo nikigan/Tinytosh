@@ -142,6 +142,14 @@ function updatePomoUi(active) {
   if (breakInput) breakInput.disabled = active;
 }
 
+async function switchScreen() {
+  try {
+    await invoke("switch_screen");
+  } catch (e) {
+    setUiStatus(String(e), "#ef4444");
+  }
+}
+
 async function togglePomodoro() {
   const workMin = parseInt(document.getElementById("work-min").value) || 45;
   const breakMin = parseInt(document.getElementById("break-min").value) || 5;
@@ -158,6 +166,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if(btn) btn.addEventListener("click", toggleConnection);
   const pomoBtn = document.getElementById("pomo-btn");
   if(pomoBtn) pomoBtn.addEventListener("click", togglePomodoro);
+  const screenBtn = document.getElementById("screen-btn");
+  if(screenBtn) screenBtn.addEventListener("click", switchScreen);
   initAutostart();
   loadPorts();
   setInterval(loadPorts, 2000);

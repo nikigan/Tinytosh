@@ -185,6 +185,13 @@ void loop() {
 
   pcMonitorService.handleSerial(pcStats, pomodoroData);
 
+  if (pcMonitorService.screenSwitchRequested) {
+    pcMonitorService.screenSwitchRequested = false;
+    Serial.println("Serial Command: Switching Screen");
+    switchToNextScreen();
+    lastScreenSwitch = millis();
+  }
+
   int reading = digitalRead(BUTTON_PIN);
 
   if (reading != lastButtonState) {

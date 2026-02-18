@@ -34,6 +34,15 @@ void PcMonitorService::parseJson(const char* jsonString, PcStats &stats, Pomodor
         return;
     }
 
+    // Handle screen switch command
+    if (doc.containsKey("screen_cmd")) {
+        const char* cmd = doc["screen_cmd"];
+        if (strcmp(cmd, "next") == 0) {
+            screenSwitchRequested = true;
+        }
+        if (!doc.containsKey("cpu_percent")) return;
+    }
+
     // Handle pomodoro commands
     if (doc.containsKey("pomo_cmd")) {
         const char* cmd = doc["pomo_cmd"];
